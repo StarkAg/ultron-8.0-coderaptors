@@ -455,16 +455,18 @@ nav .active-element > svg {
             <br>
             <p>Whisper a name, spark the flame—stories await, never the same. ✨🎬</p>
             <h3>Movies</h3>
-            <!-- Added Movie Search Input -->
-            <div class="search-container">
-                <input type="text" 
-                       class="movie-input"
-                       name="movie_name" 
-                       placeholder="Enter movie name..."
-                       aria-label="Movie search input">
-            </div>
-    
-            <a href="{{url_for('movies')}}" method="POST" class="get-started-btn">Find Content</a>
+            <!-- Added Movie Search Form -->
+            <form action="{{url_for('choice')}}" method="POST" style="width: 100%;">
+                <div class="search-container">
+                    <input type="text" 
+                           class="movie-input"
+                           name="movie_name" 
+                           placeholder="Enter movie name..."
+                           aria-label="Movie search input"
+                           required>
+                </div>
+                <button type="submit" class="get-started-btn" style="margin-top: 20px;">Find Content</button>
+            </form>
         </div>
     </div>
     
@@ -629,36 +631,48 @@ nav .active-element > svg {
        const navElement = document.querySelector("nav");
 const activeElement = document.querySelector(".active-element");
 
-const getOffsetLeft = (element) => {
-    const elementRect = element.getBoundingClientRect();
-    const navRect = navElement.getBoundingClientRect();
-    const relativeLeft = elementRect.left - navRect.left;
-    return relativeLeft + (elementRect.width - activeElement.offsetWidth) / 2;
-};
+// Safety check: ensure elements exist before proceeding
+if (!navElement || !activeElement) {
+    console.warn("Navigation elements not found");
+} else {
+    const getOffsetLeft = (element) => {
+        if (!element) return 0;
+        const elementRect = element.getBoundingClientRect();
+        const navRect = navElement.getBoundingClientRect();
+        const relativeLeft = elementRect.left - navRect.left;
+        return relativeLeft + (elementRect.width - activeElement.offsetWidth) / 2;
+    };
 
-document.fonts.ready.then(() => {
-    const activeButton = navElement.querySelector("ul li.active button");
-    gsap.set(activeElement, {
-        x: getOffsetLeft(activeButton),
-    });
-    gsap.to(activeElement, {
-        "--active-element-show": "1",
-        duration: 0.2,
-    });
-});
-
-navElement.querySelectorAll("ul li button").forEach((button, index) => {
-    button.addEventListener("click", () => {
-        const active = navElement.querySelector("ul li.active");
-        const oldIndex = [...active.parentElement.children].indexOf(active);
-
-        if (
-            index === oldIndex ||
-            navElement.classList.contains("before") ||
-            navElement.classList.contains("after")
-        ) {
-            return;
+    document.fonts.ready.then(() => {
+        const activeButton = navElement.querySelector("ul li.active button");
+        if (activeButton && activeElement) {
+            gsap.set(activeElement, {
+                x: getOffsetLeft(activeButton),
+            });
+            gsap.to(activeElement, {
+                "--active-element-show": "1",
+                duration: 0.2,
+            });
         }
+    });
+
+const buttons = navElement.querySelectorAll("ul li button");
+if (buttons && buttons.length > 0) {
+    buttons.forEach((button, index) => {
+        if (!button) return; // Skip if button is null
+        button.addEventListener("click", () => {
+            const active = navElement.querySelector("ul li.active");
+            if (!active || !active.parentElement) return; // Safety check
+            
+            const oldIndex = [...active.parentElement.children].indexOf(active);
+
+            if (
+                index === oldIndex ||
+                navElement.classList.contains("before") ||
+                navElement.classList.contains("after")
+            ) {
+                return;
+            }
 
         const x = getOffsetLeft(button);
         const direction = index > oldIndex ? "after" : "before";
@@ -684,11 +698,13 @@ navElement.querySelectorAll("ul li button").forEach((button, index) => {
                     duration: 0.3,
                     ease: "none",
                     onStart: () => {
-                        createSVG(activeElement);
-                        gsap.to(activeElement, {
-                            "--active-element-opacity": 1,
-                            duration: 0.1,
-                        });
+                        if (activeElement) {
+                            createSVG(activeElement);
+                            gsap.to(activeElement, {
+                                "--active-element-opacity": 1,
+                                duration: 0.1,
+                            });
+                        }
                     },
                 },
                 {
@@ -727,9 +743,14 @@ navElement.querySelectorAll("ul li button").forEach((button, index) => {
             ease: "none",
         });
     });
-});
+    });
+} // Close the if statement for buttons check
 
 const createSVG = (element) => {
+    if (!element) {
+        console.warn("createSVG called with null element");
+        return;
+    }
     element.innerHTML = `
         <svg viewBox="0 0 116 5" preserveAspectRatio="none" class="beam">
             <path d="M0.5 2.5L113 0.534929C114.099 0.515738 115 1.40113 115 2.5C115 3.59887 114.099 4.48426 113 4.46507L0.5 2.5Z" fill="url(#gradient-beam)"/>

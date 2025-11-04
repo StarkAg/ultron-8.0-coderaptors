@@ -10,8 +10,9 @@ def GET_MoviePosters(movie):
     movies = Movie_Recommendations.get_recommendations(movie).tolist()
     movie_dict = {}
     for i in movies:
+        # Search specifically for movie poster to avoid book covers
         params = {
-        "q": i,
+        "q": f"{i} movie poster",
         "engine": "google_images",
         "hl": 'en',
         "ijn": "0",
@@ -19,10 +20,20 @@ def GET_MoviePosters(movie):
         }
         search = serpapi.search(params)
         if 'images_results' in search and search['images_results']:
-            image_link = search['images_results'][0]['original']
-            movie_dict[i] = image_link  # Store the movie name as key and image link as value
+            # Try to find a poster image (look through first few results)
+            image_link = None
+            for result in search['images_results'][:5]:
+                # Check if it's likely a poster (has "poster" in title or looks like a poster)
+                title = result.get('title', '').lower()
+                if 'poster' in title or 'movie' in title or 'film' in title:
+                    image_link = result.get('original') or result.get('link')
+                    break
+            # If no poster found, use first result
+            if not image_link:
+                image_link = search['images_results'][0].get('original') or search['images_results'][0].get('link')
+            movie_dict[i] = image_link
         else:
-            movie_dict[i] = "No Image Found"  # If no image is found, mark as "No Image Found"
+            movie_dict[i] = "No Image Found"
     
     return movie_dict
 
@@ -61,11 +72,16 @@ def choice():
         if movie_name:
             try:
                 posters = GET_MoviePosters(movie_name)
-                return redirect(url_for('movies', submitted=True, movie_name=movie_name))
+                # Pass posters directly to movies page instead of redirecting
+                return render_template('frontend/Movies.html', posters=posters, movie_name=movie_name)
+            except ValueError as e:
+                # Movie not found - show user-friendly error
+                error_msg = str(e)
+                return render_template('frontend/choice.html', error=error_msg, movie_name=movie_name), 400
             except Exception as e:
-                return f"Error: {str(e)}", 500
+                return render_template('frontend/choice.html', error=f"Error processing request: {str(e)}", movie_name=movie_name), 500
         else:
-            return "Movie name is required", 400
+            return render_template('frontend/choice.html', error="Please enter a movie name"), 400
     return render_template('frontend/choice.html')
 
 
@@ -76,11 +92,21 @@ def movies():
         if movie_name:
             try:
                 posters = GET_MoviePosters(movie_name)
-                return render_template('frontend/Movies.html', posters=posters)
+                return render_template('frontend/Movies.html', posters=posters, movie_name=movie_name)
+            except ValueError as e:
+                return render_template('frontend/Movies.html', error=str(e), movie_name=movie_name), 400
             except Exception as e:
-                return f"Error: {str(e)}", 500
+                return render_template('frontend/Movies.html', error=f"Error processing request: {str(e)}", movie_name=movie_name), 500
         else:
-            return "Movie name is required", 400
+            return render_template('frontend/Movies.html', error="Please enter a movie name"), 400
+    # Handle GET requests with movie_name parameter (from direct URL access)
+    movie_name = request.args.get('movie_name')
+    if movie_name:
+        try:
+            posters = GET_MoviePosters(movie_name)
+            return render_template('frontend/Movies.html', posters=posters, movie_name=movie_name)
+        except Exception as e:
+            return render_template('frontend/Movies.html', error=f"Error: {str(e)}", movie_name=movie_name), 400
     return render_template('frontend/Movies.html')
 
 @app.route('/shows', methods=['GET', 'POST'])
@@ -98,4 +124,4 @@ def shows():
     return render_template('frontend/shows.html')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5001)

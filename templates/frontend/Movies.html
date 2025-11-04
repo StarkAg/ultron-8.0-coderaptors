@@ -30,7 +30,7 @@
       --y: calc(var(--active) * 200%);
       --rot: calc(var(--active) * 120deg);
       --opacity: calc(var(--zIndex) / var(--items) * 3 - 2);
-      overflow: hidden;
+      overflow: visible;
       position: absolute;
       z-index: var(--zIndex);
       width: var(--width);
@@ -49,6 +49,8 @@
       pointer-events: all;
       transform: translate(var(--x), var(--y)) rotate(var(--rot));
       transition: transform 0.8s cubic-bezier(0, 0.02, 0, 1);
+      /* Opacity handled by JavaScript based on distance */
+      /* Remove !important to allow JS to control */
     }
 
     .carousel-item .carousel-box {
@@ -220,27 +222,33 @@
 </head>
 
 <body>
-  <input type="text" id="movie-input" placeholder="Enter movie name" />
-  <button id="fetch-poster">Get Poster</button>
   <div class="container">
-    <form method="POST">
-        <input type="text" name="movie_name" placeholder="Enter movie name" required>
-        <button type="submit">Get Posters</button>
-    </form>
+
+    {% if error %}
+    <div style="position: fixed; top: 100px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(255,0,0,0.9); color: white; padding: 20px; border-radius: 10px;">
+        <h3>Error: {{ error }}</h3>
+    </div>
+    {% endif %}
 
     <div class="carousel" id="carousel">
         {% if posters %}
             {% for movie, poster in posters.items() %}
-                <div class="carousel-item">
+                <div class="carousel-item" style="--item-index: {{ loop.index0 }};">
                     <div class="carousel-box">
                         <div class="title">{{ movie }}</div>
                         <div class="num">{{ loop.index }}</div>
-                        <img src="{{ poster }}" alt="{{ movie }} Poster">
+                        <img src="{{ poster }}" alt="{{ movie }} Poster" onerror="this.src='https://via.placeholder.com/300x450?text=No+Image';">
                     </div>
                 </div>
             {% endfor %}
+        {% else %}
+            <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; text-align: center; z-index: 1000;">
+                <h2>Enter a movie name to get recommendations</h2>
+                <p>Try: "Iron Man", "The Matrix", "Avatar", etc.</p>
+            </div>
         {% endif %}
     </div>
+    
 </div>
 
   <svg style="display: none">
@@ -264,61 +272,10 @@ circle>
   <div class="cursor cursor2"></div>
 
   <script>
-    // Function to fetch movie posters based on user input
-    document.getElementById('fetch-poster').addEventListener('click', function() {
-      const movieName = document.getElementById('movie-input').value.trim();
-      if (movieName) {
-        fetch(`/movie_posters?name=${encodeURIComponent(movieName)}`)
-          .then(response => {
-            if (!response.ok) {
-              throw new Error('Movie not found or no posters available');
-            }
-            return response.json();
-          })
-          .then(data => {
-            const carousel = document.getElementById('carousel');
-            carousel.innerHTML = ''; // Clear previous items
-
-            // Loop through the returned data and create carousel items
-            for (const [title, src] of Object.entries(data)) {
-              const carouselItem = document.createElement('div');
-              carouselItem.classList.add('carousel-item');
-
-              const carouselBox = document.createElement('div');
-              carouselBox.classList.add('carousel-box');
-
-              const titleDiv = document.createElement('div');
-              titleDiv.classList.add('title');
-              titleDiv.textContent = title;
-
-              const numDiv = document.createElement('div');
-              numDiv.classList.add('num');
-              numDiv.textContent = '01'; // You can modify this if needed
-
-              const img = document.createElement('img');
-              img.src = src === "No Image Found" ? "placeholder_image_url.jpg" : src; // Use a placeholder if no image found
-              img.alt = `${title} Poster`;
-
-              // Append elements to the carousel item
-              carouselBox.appendChild(titleDiv);
-              carouselBox.appendChild(numDiv);
-              carouselBox.appendChild(img);
-              carouselItem.appendChild(carouselBox);
-              carousel.appendChild(carouselItem);
-            }
-          })
-          .catch(error => {
-            console.error('Error fetching movie poster:', error);
-            alert(error.message); // Show error message to the user
-          });
-      } else {
-        alert('Please enter a movie name.');
-      }
-    });
     /*--------------------
 Vars
 --------------------*/
-    let progress = 50
+    let progress = 50  // Start at middle to show items
     let startX = 0
     let active = 0
     let isDown = false
@@ -337,42 +294,101 @@ Vars
     /*--------------------
     Items
     --------------------*/
-    const $items = document.querySelectorAll('.carousel-item')
+    let $items = document.querySelectorAll('.carousel-item')
     const $cursors = document.querySelectorAll('.cursor')
 
     const displayItems = (item, index, active) => {
+      if (!$items || $items.length === 0) return
       const zIndex = getZindex([...$items], active)[index]
       item.style.setProperty('--zIndex', zIndex)
-      item.style.setProperty('--active', (index - active) / $items.length)
+      item.style.setProperty('--items', $items.length) // Update items count dynamically
+      
+      // Calculate position relative to active item
+      const relativePos = (index - active) / $items.length
+      item.style.setProperty('--active', relativePos)
+      
+      // Make items visible - opacity based on distance from active
+      const distance = Math.abs(index - active)
+      const opacity = Math.max(0.4, 1 - (distance * 0.2)) // Fade items further away
+      item.style.opacity = opacity
+      item.style.display = 'block'
+      item.style.visibility = 'visible'
+      
+      // Clear any x-adjust that might interfere
+      item.style.setProperty('--x-adjust', '0px')
     }
 
     /*--------------------
     Animate
     --------------------*/
     const animate = () => {
+      // Refresh items list in case new items were added
+      $items = document.querySelectorAll('.carousel-item')
+      if (!$items || $items.length === 0) {
+        console.log('No carousel items found')
+        return
+      }
+      
+      console.log(`Found ${$items.length} carousel items`)
       progress = Math.max(0, Math.min(progress, 100))
       active = Math.floor(progress / 100 * ($items.length - 1))
 
-      $items.forEach((item, index) => displayItems(item, index, active))
+      $items.forEach((item, index) => {
+        displayItems(item, index, active)
+      })
     }
-    animate()
+    
+    // Initialize carousel
+    const initCarousel = () => {
+      $items = document.querySelectorAll('.carousel-item')
+      if ($items.length > 0) {
+        console.log(`Initializing carousel with ${$items.length} items`)
+        animate()
+        initClickHandlers()
+        // Only attach listeners once
+        if (!window.listenersAttached) {
+          attachListeners()
+          window.listenersAttached = true
+        }
+      } else {
+        console.log('No carousel items found, retrying...')
+        setTimeout(initCarousel, 500) // Retry if items not ready
+      }
+    }
+    
+    // Wait for DOM to be fully ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(initCarousel, 200)
+      })
+    } else {
+      setTimeout(initCarousel, 200)
+    }
 
     /*--------------------
     Click on Items
     --------------------*/
-    $items.forEach((item, i) => {
-      item.addEventListener('click', () => {
-        progress = (i / $items.length) * 100 + 10
-        animate()
+    // Re-initialize click handlers when items are available
+    const initClickHandlers = () => {
+      $items = document.querySelectorAll('.carousel-item')
+      $items.forEach((item, i) => {
+        item.addEventListener('click', () => {
+          progress = (i / $items.length) * 100 + 10
+          animate()
+        })
       })
-    })
+    }
+    
+    // Click handlers will be initialized in initCarousel
 
     /*--------------------
     Handlers
     --------------------*/
     const handleWheel = e => {
+      e.preventDefault()
       const wheelProgress = e.deltaY * speedWheel
       progress = progress + wheelProgress
+      console.log(`Wheel scroll: progress=${progress.toFixed(2)}, active=${active}`)
       animate()
     }
 
@@ -402,13 +418,28 @@ Vars
     /*--------------------
     Listeners
     --------------------*/
-    document.addEventListener('mousewheel', handleWheel)
-    document.addEventListener('mousedown', handleMouseDown)
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
-    document.addEventListener('touchstart', handleMouseDown)
-    document.addEventListener('touchmove', handleMouseMove)
-    document.addEventListener('touchend', handleMouseUp)
+    const attachListeners = () => {
+      // Remove any existing listeners first
+      document.removeEventListener('wheel', handleWheel)
+      document.removeEventListener('mousewheel', handleWheel)
+      document.removeEventListener('mousedown', handleMouseDown)
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('touchstart', handleMouseDown)
+      document.removeEventListener('touchmove', handleMouseMove)
+      document.removeEventListener('touchend', handleMouseUp)
+      
+      // Use both 'wheel' (modern) and 'mousewheel' (legacy) events
+      document.addEventListener('wheel', handleWheel, { passive: false })
+      document.addEventListener('mousewheel', handleWheel, { passive: false })
+      document.addEventListener('mousedown', handleMouseDown)
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      document.addEventListener('touchstart', handleMouseDown, { passive: false })
+      document.addEventListener('touchmove', handleMouseMove, { passive: false })
+      document.addEventListener('touchend', handleMouseUp)
+      console.log('Carousel event listeners attached')
+    }
   </script>
 </body>
 
