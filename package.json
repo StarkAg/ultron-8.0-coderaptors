@@ -1,0 +1,11 @@
+{
+  "name": "ultron-movie-recommender",
+  "version": "1.0.0",
+  "description": "Movie & TV Show Recommendation System - Ultron 8.0",
+  "scripts": {
+    "build": "echo 'No build step required for Flask app'"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
+
