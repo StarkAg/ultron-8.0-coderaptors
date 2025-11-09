@@ -6,9 +6,15 @@ from sklearn.metrics.pairwise import cosine_similarity,cosine_similarity,linear_
 from ast import literal_eval
 import warnings
 from scipy.sparse import csr_matrix
+import os
 warnings.filterwarnings('ignore')
 
-df2 = pd.read_csv('datasets/TMDB_tv_dataset_v3.csv')
+# Get the directory where this script is located
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DATASETS_DIR = os.path.join(SCRIPT_DIR, 'datasets')
+
+# Read CSV file with proper path handling
+df2 = pd.read_csv(os.path.join(DATASETS_DIR, 'TMDB_tv_dataset_v3.csv'))
 m = df2['vote_count'].quantile(0.9)
 C = df2['vote_average'].mean()
 

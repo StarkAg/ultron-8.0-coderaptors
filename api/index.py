@@ -2,22 +2,39 @@ from flask import Flask, render_template, request
 import sys
 import os
 
-# Add parent directory to path to import modules
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Get the project root directory (parent of api/)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Add project root to Python path for imports
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 # Try to get API key from environment variable (Vercel) or from api_key.py
 try:
     API_KEY = os.environ.get('SERPAPI_KEY')
     if not API_KEY:
+        # Try to import from project root
+        sys.path.insert(0, PROJECT_ROOT)
         from api_key import API_KEY
-except ImportError:
+except (ImportError, ModuleNotFoundError):
     API_KEY = os.environ.get('SERPAPI_KEY', '')
 
+# Import project modules
 import Movie_Recommendations
 import Shows_Recommendations
 import serpapi
 
-app = Flask(__name__, template_folder=os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates'))
+# Initialize Flask app with correct paths
+# Templates are in templates/frontend/ relative to project root
+TEMPLATE_FOLDER = os.path.join(PROJECT_ROOT, 'templates')
+STATIC_FOLDER = os.path.join(PROJECT_ROOT, 'static')
+
+app = Flask(
+    __name__,
+    template_folder=TEMPLATE_FOLDER,
+    static_folder=STATIC_FOLDER,
+    static_url_path='/static'
+)
 
 def GET_MoviePosters(movie):
     movies = Movie_Recommendations.get_recommendations(movie).tolist()

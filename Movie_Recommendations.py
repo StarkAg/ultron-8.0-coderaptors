@@ -5,10 +5,16 @@ from sklearn.feature_extraction.text import TfidfVectorizer,CountVectorizer
 from sklearn.metrics.pairwise import linear_kernel,cosine_similarity
 from ast import literal_eval
 import warnings
+import os
 warnings.filterwarnings('ignore')
 
-df1 = pd.read_csv('datasets/tmdb_5000_credits.csv')
-df2 = pd.read_csv('datasets/tmdb_5000_movies.csv')
+# Get the directory where this script is located
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DATASETS_DIR = os.path.join(SCRIPT_DIR, 'datasets')
+
+# Read CSV files with proper path handling
+df1 = pd.read_csv(os.path.join(DATASETS_DIR, 'tmdb_5000_credits.csv'))
+df2 = pd.read_csv(os.path.join(DATASETS_DIR, 'tmdb_5000_movies.csv'))
 
 df1.columns = ['id','title_x','cast','crew']
 df2 = df2.merge(df1,on = 'id')
